@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>temprature</title>
+    <style>
+        html,body{
+            padding: 0;
+            margin: 0;
+        }
+        #root{
+            display: inline-flex;
+            background: #0e1114;
+            /*width: 500px;
+            height: 500px;*/
+            top:50%;
+            left: 50%;
+            transform: translate(-50%,-50%);
+            position: absolute;
+        }
+        #info,svg{
+            position: absolute;
+        }
+        #info{
+            width:200px;
+            border-radius: 3px; /*外边框圆角*/
+            background: rgba(0,0,0,0.6);
+            color: #fff; /*黑底白字*/
+            z-index: 300; /*堆叠显示*/
+            padding: 10px;
+            left:-1000px; /*初始化时，信息框不可见*/
+        }
+        #dataset-picker{
+            position: absolute;
+            top: 950px;
+        }
+        #dataset-picker input{
+            margin: 20px; /*button之间的间距*/
+        }
+    </style>
+    <script src="./d3.v5.min.js"></script>
+
+</head>
+<body>
+<div id="">
+    <div id="info"></div>
+    <svg width="1500" height="950"></svg>
+    <div id="dataset-picker"></div>
+</div>
+</body>
+</html>
+
+<script>
+    let min_Color = '#FFFCC5';
+    let max_Color = '#981942';
+    let info = d3.select('#info');
+
+    //获取数据
+    d3.csv('temperature_daily.csv',row=>{
+        //构造数据
+        row.date = new Date(row.date);
+        row.Year = row.date.getFullYear();
+        row.Month = row.date.getMonth() + 1;
+        row.day = row.date.getDate();
+        row.min_temperature = +row.min_temperature;
+        row.max_temperature = +row.max_temperature; //string转为数值
+
+        return row;
+    })
+
+
+    .then(data=>{
+        var datasetpicker = d3.select("#dataset-picker").selectAll(".dataset-button")
+            .data(['max_temperature','min_temperature']);
+            // 将两个值存进所有button 也就是两个了
+
+        datasetpicker.enter()
+            .append("input") 
+            .attr("value", function(d){ return "Dataset " + d })  //把值写进去
+            .attr("type", "button")
+            .attr("class", "dataset-button")
+            .on("click", function(d) { 
+                //heatmapChart(d);
+                //console.log(d);  20组 每组十二个值
+                draw(d==='max_temperature') 
+                //调用这个方法，d如果是max_temperature - 运行if, min - else
+            });
+
+        //svg 留白
+        let margin = {
+            left: 100,
+            top: 50,
+            right: 100,
+            bottom: 20
+        };
+        let svg = d3.select('svg');
+        //绘图容器，为的是统一偏移. <svg> <g transform="" > </svg>
+        let g = svg.append('g').attr('transform',`translate(${margin.left}, ${margin.top})`);
+
+        //绘图的长度和宽度
+        let w = +svg.attr('width') - margin.left - margin.right;
+        let h = +svg.attr('height') - margin.top - margin.bottom;
+
+        //画标尺
+        let colorLinear = d3.scaleLinear().domain([0,10]).range([min_Color, max_Color]); 
+        var colorBar = svg.append("g")
+            .attr('transform', `translate(${(margin.left + w + 10)}, ${(margin.top + 10)})`);
+        
+        //按照年份和月份组织数据
+        let dataGroupByYear = d3.nest().key(d=>d.Year).key(d=>d.Month).entries(data);
+
+        //绘制方格的比例尺(定义每个格子)
+        let scale_x = d3.scaleBand().domain(dataGroupByYear.map(d=>d.key)).range([0,w]).padding(0.1); //年 - width
+        let scale_y = d3.scaleBand().domain(d3.range(1,13)).range([0,h]).padding(0.1); // 1-12 - height
+        let scale_y_axis = d3.scaleBand().domain(["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul","Aug","Sep","Oct","Nov","Dec"]).range([0,h]).padding(0.1);
+
+
+        function draw(isHeight){
+            //循环获取每月的最低问题
+            let minValues = [];
+            if (isHeight) {  
+                dataGroupByYear.forEach(d=>{
+                    let values = d.values; 
+                        console.log('values',values); 
+                        //key 1-12 : values: 一个月的每天的max和min值
+                    values.forEach(v=>{ 
+                        minValues.push(d3.min(v.values, d=>d.max_temperature)); 
+                        //找每个key对应的values的最值； v.values是一个对象数组，求最小值，这里取max这个属性的最小值
+                    });  
+                });
+            }else {
+                dataGroupByYear.forEach(d=>{
+                    let values = d.values;
+                    // console.log('values',values);
+                    values.forEach(v=>{
+                        minValues.push(d3.min(v.values, d=>d.min_temperature));
+                    });
+                });
+            }
+
+            //使用最低温度构建颜色比例尺 (返回minValues自然排序的最小值和最大值，等同于同时调用d3.min和d3.max.)
+            let color = d3.scaleLinear().domain(d3.extent(minValues)).range([min_Color, max_Color]); 
+
+            //g.html(""); //绘图前清空g标签下的内容
+
+            //绘图开始，根据年份和月份循环
+            dataGroupByYear.forEach(d=>{
+                let values = d.values;
+                values.forEach(v=>{
+                    //添加方格-rect
+                    g.append('rect')
+                        .attr('x', scale_x(d.key)) //年的值
+                        .attr('y', scale_y(+v.key)) //月的值
+                        .attr('width', scale_x.bandwidth())
+                        .attr('height', scale_y.bandwidth())
+                        .style('fill',color(d3.min(v.values, d=>isHeight?d.max_temperature:d.min_temperature)))
+                        .on('mouseover',_=>{ //鼠标移入
+                            info.html("");
+                            info.html(`<div>${d.key}/${v.key}</div>
+                                    <div>温度：${d3.min(v.values, d=>isHeight?d.max_temperature:d.min_temperature)}</div>
+                                  `);
+                            //鼠标当前的位置
+                            let coord = d3.mouse(svg.node()); //获取svg的html元素的
+                            info.style('left',(coord[0]+10)+'px').style('top', (coord[1]+10)+'px'); //横纵坐标
+                        })
+                        .on('mouseout',_=>{
+                            info.style('left', '-1000px')
+                        });
+                });
+            });
+
+            //坐标轴
+            g.append('g').call(d3.axisTop(scale_x));
+            g.append('g').call(d3.axisLeft(scale_y_axis));
+        }
+
+        for (var k = 0; k < 12; k++) {
+        colorBar.append("rect")
+            .style("fill", colorLinear(k))
+            .attr('y', k*(+scale_y.bandwidth()))
+            .attr('width', 20)
+            .attr('height', +scale_y.bandwidth())
+            ;
+        colorBar.append("text")
+            .attr('transform', `translate(10,-10)`)
+            .style("font-size","20px")
+            .text("min");
+
+        colorBar.append("text")
+            .attr('transform', `translate(10,${(12.5 * scale_y.bandwidth())})`)
+            .style("font-size", "20px")
+            .text("max");
+        }
+
+        draw(true);
+
+    })
+</script>

@@ -1,0 +1,64 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        .edges line {
+            stroke: #999;
+            stroke-opacity: 0.6;
+        }
+
+        .nodes circle {
+            stroke: #fff;
+            stroke-width: 1.5px;
+        }
+    </style>
+    <style>
+        .grid {
+            stroke: #9A8B7A;
+            stroke-width: 1px;
+            fill: #CF7D1C;
+        }
+
+        .arc {
+            stroke: #9A8B7A;
+            fill: none;
+        }
+
+        .node {
+            fill: #EBD8C1;
+            stroke: #9A8B7A;
+            stroke-width: 1px;
+        }
+
+        circle.active {
+            fill: #FE9922;
+        }
+
+        path.active {
+            stroke: #FE9922;
+        }
+
+        circle.source {
+            fill: #93C464;
+        }
+
+        circle.target {
+            fill: #41A368;
+        }
+    </style>
+</head>
+<body>
+    <div class="force-chart"><svg width="1000" height="900"></svg></div>    
+    <div class="matrix-chart"><svg></svg></div>
+    <script src="d3/d3.v4.min.js"></script>
+    <script src="d3/d3-selection-multi.v0.4.min.js"></script>
+    <script src="script/force.js"></script>
+    <script src="script/matrix.js"></script>
+</body>
+</html>
+
+
+
+
+
